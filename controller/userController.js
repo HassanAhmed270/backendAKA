@@ -2,7 +2,7 @@ const verifyEmail = require('../emailVerify/verifyEmail.js');
 const sendOTPMail = require('../emailVerify/sentOTPMail.js');
 const User = require('../models/userModel.js');
 const Session = require('../models/sessionModel.js');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cloudinary = require("../utils/cloudinary"); // make sure you have this
 
