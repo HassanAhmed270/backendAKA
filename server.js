@@ -12,7 +12,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 3000;
 const FRONTEND_URL="https://aka-wmart.vercel.app"||process.env.FRONTEND_URL||process.env.PREVIEW_URL
-const BACKEND_URL = process.env.BACKEND_URL || `http://localhost:${port}`;
+const BACKEND_URL = "https://backender-gphtczb2gxdrbrfz.canadaeast-01.azurewebsites.net/"
 
 app.use(cors({
   origin: FRONTEND_URL, credentials:true
