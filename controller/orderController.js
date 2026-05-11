@@ -274,7 +274,7 @@ const inquiryOrder = async (req, res) => {
         .join("\n") +
       `\n\n👉 What is the latest update on this order?`;
 
-    const phone = "923357428542"; // company number fixed
+    const phone = "923357428542"; 
 
     const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
 
