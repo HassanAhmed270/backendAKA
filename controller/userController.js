@@ -5,6 +5,7 @@ const Session = require('../models/sessionModel.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cloudinary = require("../utils/cloudinary"); // make sure you have this
+const User = require("../models/User");
 
 // ================= REGISTER =================
 const register = async (req, res) => {
@@ -71,9 +72,6 @@ const register = async (req, res) => {
         });
     }
 };
-
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
 
 // ================= VERIFY EMAIL =================
 const verify = async (req, res) => {
