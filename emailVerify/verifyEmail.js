@@ -13,7 +13,7 @@ const mailConfiguration = {
             from: `"KMart :" <${process.env.EMAIL_USER}>`,
             to:       email,
             subject:  `Email Verification`,
-            text:     `Click this link link to verify your email  http://localhost:5173/verify/${token}   ThankYou!`
+            text:     `Click this link link to verify your email  https://aka-wmart.vercel.app/verify/${token}   ThankYou!`
  };
  transporter.sendMail(mailConfiguration, function(error,info){
     if(error){throw Error(error)}
