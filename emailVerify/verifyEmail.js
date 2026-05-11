@@ -10,7 +10,7 @@ const verifyEmail=(token, email, frontendUrl, backendUrl)=>{
     }
 });
 const mailConfiguration = {
-            from: `"KMart :" <${process.env.EMAIL_USER}>`,
+            from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
             to:       email,
             subject:  `Email Verification`,
             text:     `Click this link to verify your email: ${backendUrl}/verify-email/${token}   ThankYou!`

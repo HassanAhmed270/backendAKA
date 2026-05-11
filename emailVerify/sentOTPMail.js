@@ -10,7 +10,7 @@ const sentOTPMail=(otp, email)=>{
     }
 });
 const mailConfiguration = {
-            from: `"KMart :" <${process.env.EMAIL_USER}>`,
+            from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
             to:       email,
             subject:  `PASSWORD RESET OTP`,
             html:     `This is your OTP<b> ${otp}</b>`
