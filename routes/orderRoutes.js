@@ -7,7 +7,8 @@ const {
   getMyOrder,
   getUserOrders,
   getAllOrders,
-  getSalesData
+  getSalesData,
+  inquiryOrder
 } = require("../controller/orderController.js");
 
 const { auth ,isAdmin} = require("../middleware/isAuthenticated.js");
@@ -22,5 +23,6 @@ router.get("/get-my-order", auth, getMyOrder);
 router.get("/user-order/:userId", auth, isAdmin ,getUserOrders);
 router.get("/all-orders", auth,isAdmin, getAllOrders);
 router.get("/sales",auth,isAdmin,getSalesData)
+router.post("/inquire",auth, inquiryOrder);
 
 module.exports = router;

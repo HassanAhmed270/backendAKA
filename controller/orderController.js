@@ -245,6 +245,52 @@ const getAllOrders = async (req, res) => {
     });
   }
 };
+const inquiryOrder = async (req, res) => {
+  try {
+    const { orderId } = req.body;
+
+    const order = await Order.findById(orderId)
+      .populate("user", "firstName lastName email")
+      .populate("products.productId", "productName");
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    const user = order.user;
+
+    const message =
+      `🛒 *Order Inquiry*\n\n` +
+      `Customer: ${user?.firstName} ${user?.lastName}\n` +
+      `Email: ${user?.email}\n\n` +
+      `Order ID: ${order._id}\n\n` +
+      `Status: ${order.status}\n\n` +
+      `Products:\n` +
+      order.products
+        .map(p => `• ${p.productId?.productName} x ${p.quantity}`)
+        .join("\n") +
+      `\n\n👉 What is the latest update on this order?`;
+
+    const phone = "923357428542"; // company number fixed
+
+    const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(message)}`;
+
+    return res.json({
+      success: true,
+      url
+    });
+
+  } catch (error) {
+    console.log("Inquiry Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Inquiry failed"
+    });
+  }
+};
 
 const getSalesData = async (req, res) => {
   try {
@@ -341,4 +387,4 @@ const getSalesData = async (req, res) => {
     });
   }
 };
-module.exports = { getSalesData, createOrder, verifyPayment, getMyOrder, getUserOrders,getAllOrders };
+module.exports = { getSalesData, createOrder, verifyPayment, getMyOrder, getUserOrders,getAllOrders, inquiryOrder };
