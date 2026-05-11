@@ -5,6 +5,9 @@ const Session = require('../models/sessionModel.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cloudinary = require("../utils/cloudinary");
+
+// Get frontend URL from environment
+const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PREVIEW_URL || "http://localhost:5173";
 // ================= IMPORTS =================
 
 // ================= REGISTER =================
@@ -64,7 +67,7 @@ const register = async (req, res) => {
         newUser.token = token;
         await newUser.save();
 
-        await verifyEmail(token, email);
+        await verifyEmail(token, email, FRONTEND_URL);
 
         return res.status(201).json({
             success: true,
@@ -196,7 +199,7 @@ const reVerify = async (req, res) => {
             { expiresIn: '10m' }
         );
 
-        await verifyEmail(token, email);
+        await verifyEmail(token, email, FRONTEND_URL);
 
         user.token = token;
         await user.save();

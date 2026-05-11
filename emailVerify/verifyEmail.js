@@ -1,7 +1,7 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const verifyEmail=(token, email)=>{
+const verifyEmail=(token, email, frontendUrl)=>{
   const transporter = nodemailer.createTransport({
     service: 'gmail', // You can use 'hotmail', 'yahoo', etc.
     auth: {
@@ -13,7 +13,7 @@ const mailConfiguration = {
             from: `"KMart :" <${process.env.EMAIL_USER}>`,
             to:       email,
             subject:  `Email Verification`,
-            text:     `Click this link link to verify your email  https://aka-wmart.vercel.app/verify/${token}   ThankYou!`
+            text:     `Click this link to verify your email: ${frontendUrl}/verify/${token}   ThankYou!`
  };
  transporter.sendMail(mailConfiguration, function (error, info) {
     if (error) {
