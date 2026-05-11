@@ -8,6 +8,7 @@ const cloudinary = require("../utils/cloudinary");
 
 // Get frontend URL from environment
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PREVIEW_URL || "http://localhost:5173";
+const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
 // ================= IMPORTS =================
 
 // ================= REGISTER =================
@@ -67,7 +68,7 @@ const register = async (req, res) => {
         newUser.token = token;
         await newUser.save();
 
-        await verifyEmail(token, email, FRONTEND_URL);
+        await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
 
         return res.status(201).json({
             success: true,
@@ -83,89 +84,7 @@ const register = async (req, res) => {
     }
 };
 
-// ================= VERIFY EMAIL =================
-const verify = async (req, res) => {
-  try {
-    let token;
-
-    // ✅ OPTION 1: from Authorization header (current frontend)
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith("Bearer ")) {
-      token = authHeader.split(" ")[1];
-    }
-
-    // ✅ OPTION 2: from URL param (email click fallback)
-    if (!token && req.params.token) {
-      token = req.params.token;
-    }
-
-    // ❌ No token found
-    if (!token) {
-      return res.status(400).json({
-        success: false,
-        message: "Token is missing"
-      });
-    }
-
-    // ================= VERIFY TOKEN =================
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.SECRET_KEY);
-    } catch (error) {
-      if (error.name === "TokenExpiredError") {
-        return res.status(400).json({
-          success: false,
-          message: "Token has expired"
-        });
-      }
-
-      return res.status(400).json({
-        success: false,
-        message: "Invalid token"
-      });
-    }
-
-    // ================= FIND USER =================
-    const user = await User.findById(decoded.id);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found"
-      });
-    }
-
-    // ================= ALREADY VERIFIED =================
-    if (user.isVerified) {
-      return res.status(200).json({
-        success: true,
-        message: "Email already verified"
-      });
-    }
-
-    // ================= UPDATE USER =================
-    user.token = null;
-    user.isVerified = true;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: "Email verification successful"
-    });
-
-  } catch (error) {
-    console.error("Verify error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Server error"
-    });
-  }
-};
-
-module.exports = verify;
-
-// ================= VERIFY EMAIL =================
+// ================= RE-VERIFY EMAIL =================
 const reVerify = async (req, res) => {
     try {
         const { email } = req.body;
@@ -199,7 +118,7 @@ const reVerify = async (req, res) => {
             { expiresIn: '10m' }
         );
 
-        await verifyEmail(token, email, FRONTEND_URL);
+        await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
 
         user.token = token;
         await user.save();
@@ -571,5 +490,5 @@ const updateUser = async (req, res) => {
     }
 };
 
-// ✅ Export BOTH functions
-module.exports = { register, verify, reVerify, login, logout, forgotPassword, verifyOTP, changePassword, getUserById,updateUser }
+// ✅ Export functions
+module.exports = { register, reVerify, login, logout, forgotPassword, verifyOTP, changePassword, getUserById,updateUser }

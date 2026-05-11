@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const {register,verify, reVerify,login, logout, forgotPassword,verifyOTP,changePassword, getUserById,updateUser} = require('../controller/userController.js');
+const {register, reVerify,login, logout, forgotPassword,verifyOTP,changePassword, getUserById,updateUser} = require('../controller/userController.js');
 const {auth,isAdmin}=require('../middleware/isAuthenticated.js');
 const { allUsers } = require('../controller/adminControl.js');
 const { singleUpload } = require('../middleware/multer.js');
@@ -9,7 +9,6 @@ console.log("User routes loaded..."); // ✅ keep log here
 router.post('/register', register); // ✅ correct handler
 router.post('/login', login); // ✅ correct handler
 router.post('/logout',auth, logout); // ✅ correct handler
-router.post('/verify', verify); // ✅ correct handler
 router.post('/reVerify', reVerify); // ✅ correct handler
 router.post('/forgot-password', forgotPassword); // ✅ correct handler
 router.post('/verify-otp/:email', verifyOTP); // ✅ correct handler
