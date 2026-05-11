@@ -15,11 +15,15 @@ const mailConfiguration = {
             subject:  `Email Verification`,
             text:     `Click this link link to verify your email  https://aka-wmart.vercel.app/verify/${token}   ThankYou!`
  };
- transporter.sendMail(mailConfiguration, function(error,info){
-    if(error){throw Error(error)}
+ transporter.sendMail(mailConfiguration, function (error, info) {
+    if (error) {
+        console.error("Email sending failed:", error);
+        return;
+    }
+
     console.log("Email Sent Successfully");
-    console.log(info);
- })
+    console.log(info.response);
+});
 }
 
 

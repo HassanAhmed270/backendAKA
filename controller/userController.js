@@ -72,63 +72,90 @@ const register = async (req, res) => {
     }
 };
 
+const jwt = require("jsonwebtoken");
+const User = require("../models/User");
+
 // ================= VERIFY EMAIL =================
 const verify = async (req, res) => {
-    try {
-        const authHeader = req.headers.authorization;
+  try {
+    let token;
 
-        if (!authHeader || !authHeader.startsWith("Bearer ")) {
-            return res.status(400).json({
-                success: false,
-                message: "Authorization Token is Missing or Invalid"
-            });
-        }
-
-        const token = authHeader.split(" ")[1];
-
-        let decoded;
-        try {
-            decoded = jwt.verify(token, process.env.SECRET_KEY);
-        } catch (error) {
-            if (error.name === 'TokenExpiredError') {
-                return res.status(400).json({
-                    success: false,
-                    message: "The Registration Token has expired"
-                });
-            }
-
-            return res.status(400).json({
-                success: false,
-                message: "Token Verification Failed"
-            });
-        }
-
-        const user = await User.findById(decoded.id);
-
-        if (!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User Not Found"
-            });
-        }
-
-        // Update user
-        user.token = null;
-        user.isVerified = true;
-        await user.save();
-
-        return res.status(200).json({
-            success: true,
-            message: "Email Verification Successful"
-        });
-
-    } catch (error) {
-        return res.status(500).json({
-            success: false,
-            message: error.message
-        });
+    // ✅ OPTION 1: from Authorization header (current frontend)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.split(" ")[1];
     }
+
+    // ✅ OPTION 2: from URL param (email click fallback)
+    if (!token && req.params.token) {
+      token = req.params.token;
+    }
+
+    // ❌ No token found
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Token is missing"
+      });
+    }
+
+    // ================= VERIFY TOKEN =================
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.SECRET_KEY);
+    } catch (error) {
+      if (error.name === "TokenExpiredError") {
+        return res.status(400).json({
+          success: false,
+          message: "Token has expired"
+        });
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: "Invalid token"
+      });
+    }
+
+    // ================= FIND USER =================
+    const user = await User.findById(decoded.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found"
+      });
+    }
+
+    // ================= ALREADY VERIFIED =================
+    if (user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        message: "Email already verified"
+      });
+    }
+
+    // ================= UPDATE USER =================
+    user.token = null;
+    user.isVerified = true;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verification successful"
+    });
+
+  } catch (error) {
+    console.error("Verify error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Server error"
+    });
+  }
 };
+
+module.exports = verify;
 
 // ================= VERIFY EMAIL =================
 const reVerify = async (req, res) => {
