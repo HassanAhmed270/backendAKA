@@ -8,7 +8,7 @@ const cloudinary = require("../utils/cloudinary");
 
 // Get frontend URL from environment
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PREVIEW_URL || "http://localhost:5173";
-const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:3000";
+const BACKEND_URL = "https://backender-gphtczb2gxdrbrfz.canadaeast-01.azurewebsites.net/";
 // ================= IMPORTS =================
 
 // ================= REGISTER =================
