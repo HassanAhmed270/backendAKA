@@ -4,8 +4,8 @@ const User = require('../models/userModel.js');
 const Session = require('../models/sessionModel.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const cloudinary = require("../utils/cloudinary"); // make sure you have this
-const User = require("../models/User");
+const cloudinary = require("../utils/cloudinary");
+// ================= IMPORTS =================
 
 // ================= REGISTER =================
 const register = async (req, res) => {
