@@ -8,7 +8,7 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    // 🟢 PRODUCTS ARRAY (ONLY PRODUCT DATA)
+    // 🟢 PRODUCTS ARRAY
     products: [
       {
         productId: {
@@ -23,7 +23,7 @@ const orderSchema = new mongoose.Schema(
       },
     ],
 
-    // 🟢 ORDER LEVEL DATA (FIXED)
+    // 🟢 ORDER LEVEL DATA
     amount: {
       type: Number,
       required: true,
@@ -45,7 +45,7 @@ const orderSchema = new mongoose.Schema(
       default: "Pending",
     },
 
-    // 🟢 PAYMENT INFO (JazzCash simulation)
+    // 🟢 PAYMENT INFO
     paymentMethod: {
       type: String,
       default: "JazzCash",
@@ -54,6 +54,12 @@ const orderSchema = new mongoose.Schema(
     paymentOrderId: String,
     paymentTransactionId: String,
     paymentSignature: String,
+
+    // 🔥 NEW: DETAILS OBJECT (Pickup OR Delivery)
+    Details: {
+      type: Object,
+      default: null,
+    },
   },
   { timestamps: true }
 );

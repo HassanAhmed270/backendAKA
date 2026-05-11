@@ -6,7 +6,7 @@ const Product = require("../models/productModel");
 // 🟢 CREATE ORDER
 const createOrder = async (req, res) => {
   try {
-    const { products, amount, shipping, currency } = req.body;
+    const { products, amount, shipping, currency, Details } = req.body;
 
     const paymentOrderId = "JC_" + Date.now();
 
@@ -26,6 +26,9 @@ const createOrder = async (req, res) => {
       status: "Pending",
       paymentMethod: "JazzCash",
       paymentOrderId,
+
+      // 🔥 ADD THIS LINE
+      Details: Details || null,
     });
 
     await newOrder.save();
