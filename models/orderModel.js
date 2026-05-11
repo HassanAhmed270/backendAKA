@@ -29,11 +29,6 @@ const orderSchema = new mongoose.Schema(
       required: true,
     },
 
-    tax: {
-      type: Number,
-      default: 0,
-    },
-
     shipping: {
       type: Number,
       default: 0,

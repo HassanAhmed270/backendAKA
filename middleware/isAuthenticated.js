@@ -48,6 +48,14 @@ console.log("BODY:", req.body);
                 message: "User Not Found"
             });
         }
+
+        // Check session version
+        if (!decoded.sessionVersion || decoded.sessionVersion !== user.sessionVersion) {
+            return res.status(401).json({
+                success: false,
+                message: "Session Expired"
+            });
+        }
  
         req.user = user;
         next();

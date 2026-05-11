@@ -11,7 +11,7 @@ router.post('/login', login); // ✅ correct handler
 router.post('/logout',auth, logout); // ✅ correct handler
 router.post('/verify', verify); // ✅ correct handler
 router.post('/reVerify', reVerify); // ✅ correct handler
-router.post('/forgot-password',auth, forgotPassword); // ✅ correct handler
+router.post('/forgot-password', forgotPassword); // ✅ correct handler
 router.post('/verify-otp/:email', verifyOTP); // ✅ correct handler
 router.post('/change-password/:email', changePassword); // ✅ correct handler
 router.get('/get-user/:userId', getUserById); // ✅ correct handler

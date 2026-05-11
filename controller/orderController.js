@@ -6,7 +6,7 @@ const Product = require("../models/productModel");
 // 🟢 CREATE ORDER
 const createOrder = async (req, res) => {
   try {
-    const { products, amount, tax, shipping, currency } = req.body;
+    const { products, amount, shipping, currency } = req.body;
 
     const paymentOrderId = "JC_" + Date.now();
 
@@ -21,7 +21,6 @@ const createOrder = async (req, res) => {
       user: req.user._id,
       products,
       amount,
-      tax,
       shipping,
       currency,
       status: "Pending",

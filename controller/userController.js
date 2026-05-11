@@ -32,10 +32,17 @@ const register = async (req, res) => {
         const existingUser = await User.findOne({ email });
 
         if (existingUser) {
-            return res.status(400).json({
-                success: false,
-                message: "User Already Exists"
-            });
+            if (!existingUser.isVerified) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Account already exists but is not verified. Please verify your account."
+                });
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: "User Already Exists"
+                });
+            }
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -243,20 +250,16 @@ const login = async (req, res) => {
             });
         }
 
+        // Increment session version to invalidate previous sessions
+        existingUser.sessionVersion += 1;
+        existingUser.isLoggedIn = true;
+        await existingUser.save();
+
         const accessToken = jwt.sign(
-            { id: existingUser._id },
+            { id: existingUser._id, sessionVersion: existingUser.sessionVersion },
             process.env.SECRET_KEY,
             { expiresIn: '10d' }
         );
-
-        const refreshToken = jwt.sign(
-            { id: existingUser._id },
-            process.env.SECRET_KEY,
-            { expiresIn: '30d' }
-        );
-
-        existingUser.isLoggedIn = true;
-        await existingUser.save();
 
         const existingSession = await Session.findOne({ user: existingUser._id });
 
@@ -265,19 +268,14 @@ const login = async (req, res) => {
         }
 
         await Session.create({
-            user: existingUser._id,
-            token: refreshToken,
-            expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            user: existingUser._id
         });
 
         return res.status(200).json({
-
             success: true,
             message: `Login Successful, Welcome Back ${existingUser.firstName}`,
             user: existingUser,
-            accessToken,
-            refreshToken
-
+            accessToken
         });
 
     } catch (error) {
@@ -302,6 +300,7 @@ const logout = async (req, res) => {
         }
 
         user.isLoggedIn = false;
+        user.sessionVersion += 1; // Invalidate current session
         await user.save();
 
         await Session.deleteMany({ user: userId });
