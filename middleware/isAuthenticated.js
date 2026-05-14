@@ -15,9 +15,11 @@ const auth = async (req, res, next) => {
         const token = authHeader.split(" ")[1];
 
         let decoded;
+
         try {
             decoded = jwt.verify(token, process.env.SECRET_KEY);
         } catch (error) {
+
             if (error.name === "TokenExpiredError") {
                 return res.status(401).json({
                     success: false,
@@ -47,8 +49,11 @@ const auth = async (req, res, next) => {
             });
         }
 
-        // Check session version
-        if (!decoded.sessionVersion || decoded.sessionVersion !== user.sessionVersion) {
+        // Session Version Check
+        if (
+            !decoded.sessionVersion ||
+            decoded.sessionVersion !== user.sessionVersion
+        ) {
             return res.status(401).json({
                 success: false,
                 message: "Session Expired"
@@ -56,6 +61,7 @@ const auth = async (req, res, next) => {
         }
 
         req.user = user;
+
         next();
 
     } catch (error) {
@@ -68,6 +74,7 @@ const auth = async (req, res, next) => {
 
 const isAdmin = async (req, res, next) => {
     try {
+
         if (req.user && req.user.role === 'admin') {
             next();
         } else {
@@ -76,28 +83,40 @@ const isAdmin = async (req, res, next) => {
                 message: "Unauthorized"
             });
         }
+
     } catch (error) {
         return res.status(500).json({
             success: false,
             message: error.message
         });
     }
-    const isAdminOrWorker = async (req, res, next) => {
-        try {
-            if (req.user && req.user.role === 'admin' || req.user.role === 'worker') {
-                next();
-            } else {
-                return res.status(403).json({
-                    success: false,
-                    message: "Unauthorized"
-                });
-            }
-        } catch (error) {
-            return res.status(500).json({
+};
+
+const isAdminOrWorker = async (req, res, next) => {
+    try {
+
+        if (
+            req.user &&
+            (req.user.role === 'admin' || req.user.role === 'worker')
+        ) {
+            next();
+        } else {
+            return res.status(403).json({
                 success: false,
-                message: error.message
+                message: "Unauthorized"
             });
         }
-    };
+
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
 };
-module.exports = { auth, isAdmin ,isAdminOrWorker};
+
+module.exports = {
+    auth,
+    isAdmin,
+    isAdminOrWorker
+};
