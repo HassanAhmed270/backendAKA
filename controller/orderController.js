@@ -337,12 +337,12 @@ const getSalesData = async (req, res) => {
     // 📦 PRODUCTS
     const totalProducts = await Product.countDocuments({});
 
-    // 🧾 ORDERS (PAID)
-    const totalOrders = await Order.countDocuments({ status: "Paid" });
+    // 🧾 ORDERS (COMPLETED OR PAID)
+    const totalOrders = await Order.countDocuments({ status: { $in: ["Paid", "Completed"] } });
 
-    // 💰 TOTAL SALES (AGGREGATION)
+    // 💰 TOTAL SALES (AGGREGATION) - PKR
     const totalSaleAgg = await Order.aggregate([
-      { $match: { status: "Paid" } },
+      { $match: { status: { $in: ["Paid", "Completed"] } } },
       {
         $group: {
           _id: null,
@@ -359,11 +359,11 @@ const getSalesData = async (req, res) => {
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
 
-    // 📊 SALES BY DATE
+    // 📊 SALES BY DATE - PKR
     const salesByDate = await Order.aggregate([
       {
         $match: {
-          status: "Paid",
+          status: { $in: ["Paid", "Completed"] },
           createdAt: { $gte: thirtyDaysAgo }
         }
       },
@@ -386,7 +386,8 @@ const getSalesData = async (req, res) => {
     const formattedSales = salesByDate.map((item) => {
       const formatted = {
         date: item._id,
-        amount: item.amount
+        amount: item.amount,
+        currency: "PKR"
       };
 
       return formatted;
@@ -400,6 +401,7 @@ const getSalesData = async (req, res) => {
       totalProducts,
       totalOrders,
       totalSales,
+      currency: "PKR",
       sales: formattedSales
     });
 
