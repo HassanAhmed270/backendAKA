@@ -54,7 +54,7 @@ const auth = async (req, res, next) => {
                 message: "Session Expired"
             });
         }
- 
+
         req.user = user;
         next();
 
@@ -68,9 +68,9 @@ const auth = async (req, res, next) => {
 
 const isAdmin = async (req, res, next) => {
     try {
-        if(req.user && req.user.role==='admin'){
+        if (req.user && req.user.role === 'admin') {
             next();
-        }else{
+        } else {
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized"
@@ -82,5 +82,22 @@ const isAdmin = async (req, res, next) => {
             message: error.message
         });
     }
+    const isAdminOrWorker = async (req, res, next) => {
+        try {
+            if (req.user && req.user.role === 'admin' || req.user.role === 'worker') {
+                next();
+            } else {
+                return res.status(403).json({
+                    success: false,
+                    message: "Unauthorized"
+                });
+            }
+        } catch (error) {
+            return res.status(500).json({
+                success: false,
+                message: error.message
+            });
+        }
+    };
 };
-module.exports = {auth,isAdmin}
+module.exports = { auth, isAdmin ,isAdminOrWorker};
