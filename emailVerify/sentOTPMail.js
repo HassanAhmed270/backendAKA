@@ -17,8 +17,6 @@ const mailConfiguration = {
  };
  transporter.sendMail(mailConfiguration, function(error,info){
     if(error){throw Error(error)}
-    console.log("OTP Sent Successfully");
-    console.log(info);
  })
 }
 

@@ -6,7 +6,7 @@ const Product = require("../models/productModel");
 // 🟢 CREATE ORDER
 const createOrder = async (req, res) => {
   try {
-    const { products, amount, shipping, currency, Details } = req.body;
+    const { products, amount, shipping, currency, Details, paymentMethod } = req.body;
 
     const paymentOrderId = "JC_" + Date.now();
 
@@ -18,16 +18,15 @@ const createOrder = async (req, res) => {
     };
 
     const newOrder = new Order({
-      user: req.user._id,
+      user: req.user ? req.user._id : null,
+      guestDetails: req.user ? null : Details || null,
       products,
       amount,
       shipping,
       currency,
       status: "Pending",
-      paymentMethod: "JazzCash",
+      paymentMethod: paymentMethod || "JazzCash",
       paymentOrderId,
-
-      // 🔥 ADD THIS LINE
       Details: Details || null,
     });
 
@@ -41,10 +40,9 @@ const createOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error);
     res.status(500).json({
       success: false,
-      message: "Failed to create order",
+      message: "Unable to place order. Please try again.",
     });
   }
 };
@@ -53,9 +51,6 @@ const createOrder = async (req, res) => {
 // 🟢 VERIFY PAYMENT
 const verifyPayment = async (req, res) => {
   try {
-    console.log("🔥 VERIFY PAYMENT HIT");
-
-    const userId = req.user._id;
 
     const {
       paymentOrderId,
@@ -65,7 +60,8 @@ const verifyPayment = async (req, res) => {
       paymentMethod // 👈 ADD THIS (COD / ONLINE)
     } = req.body;
 
-    console.log("📦 Request Body:", req.body);
+    const userId = req.user?._id;
+
 
     // ❌ missing order id
     if (!paymentOrderId) {
@@ -80,18 +76,18 @@ const verifyPayment = async (req, res) => {
       const order = await Order.findOneAndUpdate(
         { paymentOrderId },
         {
-          status: "Pending (COD)",
+          status: "Pending",
         },
         { new: true }
       );
 
-      console.log("💰 COD ORDER UPDATED:", order);
 
-      // clear cart
-      await Cart.findOneAndUpdate(
-        { user: userId },
-        { $set: { items: [], totalPrice: 0 } }
-      );
+      if (userId) {
+        await Cart.findOneAndUpdate(
+          { userId },
+          { $set: { items: [], totalPrice: 0 } }
+        );
+      }
 
       return res.status(200).json({
         success: true,
@@ -108,7 +104,6 @@ const verifyPayment = async (req, res) => {
         { new: true }
       );
 
-      console.log("❌ PAYMENT FAILED:", order);
 
       return res.status(200).json({
         success: false,
@@ -143,13 +138,13 @@ const verifyPayment = async (req, res) => {
       });
     }
 
-    console.log("✅ PAYMENT SUCCESS:", order);
 
-    // 🧹 clear cart
-    await Cart.findOneAndUpdate(
-      { user: userId },
-      { $set: { items: [], totalPrice: 0 } }
-    );
+    if (userId) {
+      await Cart.findOneAndUpdate(
+        { userId },
+        { $set: { items: [], totalPrice: 0 } }
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -158,7 +153,6 @@ const verifyPayment = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("❌ VERIFY ERROR:", error);
 
     res.status(500).json({
       success: false,
@@ -191,7 +185,6 @@ const getMyOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
@@ -217,7 +210,6 @@ const getUserOrders = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
@@ -238,7 +230,6 @@ const getAllOrders = async (req, res) => {
     });
 
   } catch (error) {
-    console.log(error);
     res.status(500).json({
       success: false,
       message: "Failed to fetch orders",
@@ -284,7 +275,6 @@ const inquiryOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("Inquiry Error:", error);
     res.status(500).json({
       success: false,
       message: "Inquiry failed"
@@ -292,21 +282,63 @@ const inquiryOrder = async (req, res) => {
   }
 };
 
+const updateOrderStatus = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { status } = req.body;
+
+    const allowed = [
+      "Pending",
+      "Confirmed",
+      "Out for Delivery",
+      "Completed",
+      "Paid",
+      "Failed"
+    ];
+
+    if (!allowed.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order status"
+      });
+    }
+
+    const order = await Order.findByIdAndUpdate(
+      orderId,
+      { status },
+      { new: true }
+    );
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      order
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update order status"
+    });
+  }
+};
+
 const getSalesData = async (req, res) => {
   try {
-    console.log("🔥 getSalesData API HIT");
 
     // 👤 USERS
     const totalUsers = await User.countDocuments({});
-    console.log("👤 totalUsers:", totalUsers);
 
     // 📦 PRODUCTS
     const totalProducts = await Product.countDocuments({});
-    console.log("📦 totalProducts:", totalProducts);
 
     // 🧾 ORDERS (PAID)
     const totalOrders = await Order.countDocuments({ status: "Paid" });
-    console.log("🧾 totalPaidOrders:", totalOrders);
 
     // 💰 TOTAL SALES (AGGREGATION)
     const totalSaleAgg = await Order.aggregate([
@@ -319,16 +351,13 @@ const getSalesData = async (req, res) => {
       }
     ]);
 
-    console.log("📊 totalSaleAgg:", totalSaleAgg);
 
     const totalSales = totalSaleAgg[0]?.total || 0;
-    console.log("💰 totalSales:", totalSales);
 
     // 📅 LAST 30 DAYS
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    console.log("📅 thirtyDaysAgo:", thirtyDaysAgo);
 
     // 📊 SALES BY DATE
     const salesByDate = await Order.aggregate([
@@ -352,7 +381,6 @@ const getSalesData = async (req, res) => {
       { $sort: { _id: 1 } }
     ]);
 
-    console.log("📊 raw salesByDate:", salesByDate);
 
     // 🔄 FORMAT DATA
     const formattedSales = salesByDate.map((item) => {
@@ -361,11 +389,9 @@ const getSalesData = async (req, res) => {
         amount: item.amount
       };
 
-      console.log("➡️ formatted item:", formatted);
       return formatted;
     });
 
-    console.log("✅ FINAL formattedSales:", formattedSales);
 
     // 📤 RESPONSE
     res.status(200).json({
@@ -378,7 +404,6 @@ const getSalesData = async (req, res) => {
     });
 
   } catch (error) {
-    console.log("❌ ERROR:", error);
 
     res.status(500).json({
       success: false,
@@ -387,4 +412,4 @@ const getSalesData = async (req, res) => {
     });
   }
 };
-module.exports = { getSalesData, createOrder, verifyPayment, getMyOrder, getUserOrders,getAllOrders, inquiryOrder };
+module.exports = { getSalesData, createOrder, verifyPayment, getMyOrder, getUserOrders, getAllOrders, inquiryOrder, updateOrderStatus };

@@ -13,7 +13,6 @@ const BACKEND_URL = "https://backender-gphtczb2gxdrbrfz.canadaeast-01.azurewebsi
 
 // ================= REGISTER =================
 const register = async (req, res) => {
-    console.log("Register API HIT");
     
     const { firstName, lastName, email, password, role } = req.body;
     // 🔒 default role
@@ -22,7 +21,6 @@ const register = async (req, res) => {
     // ✅ agar role pass ho aur logged-in user admin ho
     if (role){
        finalRole = role;
-       console.log("FInalrole", finalRole);
     };
 
     if (!firstName || !lastName || !email || !password) {
@@ -161,7 +159,7 @@ const login = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(400).json({
                 success: false,
-                message: "Invalid Credential"
+                message: "Username or password incorrect"
             });
         }
 
@@ -408,6 +406,59 @@ const getUserById = async (req, res) => {
     }
 };
 
+const convertToWorker = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        user.role = "worker";
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "User converted to worker successfully"
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+const removeWorkerRole = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        user.role = "user";
+        await user.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Worker role removed successfully"
+        });
+    } catch (error) {
+        return res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
 
 const updateUser = async (req, res) => {
     try {
@@ -491,4 +542,4 @@ const updateUser = async (req, res) => {
 };
 
 // ✅ Export functions
-module.exports = { register, reVerify, login, logout, forgotPassword, verifyOTP, changePassword, getUserById,updateUser }
+module.exports = { register, reVerify, login, logout, forgotPassword, verifyOTP, changePassword, getUserById, convertToWorker, removeWorkerRole, updateUser }

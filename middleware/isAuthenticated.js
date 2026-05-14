@@ -2,8 +2,6 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/userModel.js');
 
 const auth = async (req, res, next) => {
-    console.log("HEADERS:", req.headers);
-console.log("BODY:", req.body);
     try {
         const authHeader = req.headers.authorization;
 
@@ -70,11 +68,9 @@ console.log("BODY:", req.body);
 
 const isAdmin = async (req, res, next) => {
     try {
-        console.log(req.user);
         if(req.user && req.user.role==='admin'){
             next();
         }else{
-            console.log("HEHE",req.user.role);
             return res.status(403).json({
                 success: false,
                 message: "Unauthorized"

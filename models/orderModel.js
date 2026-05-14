@@ -5,7 +5,13 @@ const orderSchema = new mongoose.Schema(
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
+      default: null
+    },
+
+    guestDetails: {
+      type: Object,
+      default: null
     },
 
     // 🟢 PRODUCTS ARRAY
@@ -41,7 +47,7 @@ const orderSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["Pending", "Paid", "Failed"],
+      enum: ["Pending", "Confirmed", "Out for Delivery", "Completed", "Paid", "Failed"],
       default: "Pending",
     },
 

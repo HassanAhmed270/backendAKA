@@ -50,7 +50,6 @@ const addNewProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
     try {
         const { productId } = req.params;
-        console.log(productId);
         const product = await Product.findById(productId);
         if (!product) {
             return res.status(404).json({

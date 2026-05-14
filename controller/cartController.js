@@ -10,7 +10,6 @@ const calculateTotal = (items) => {
 // ✅ GET CART
 const getCart = async (req, res) => {
     try {
-        console.log(req.user._id);
         const userId = req.user._id;
 
         const cart = await Cart.findOne({ userId }).populate("items.productId");
@@ -39,7 +38,6 @@ const emptyCart = async (req, res) => {
     try {
         const userId = req.user._id;
 
-        console.log("🧹 EMPTY CART USER:", userId);
 
         const cart = await Cart.findOne({ userId });
 
@@ -75,7 +73,6 @@ const emptyCart = async (req, res) => {
         */
 
     } catch (error) {
-        console.log("❌ EMPTY CART ERROR:", error);
 
         return res.status(500).json({
             success: false,
@@ -92,8 +89,6 @@ const addToCart = async (req, res) => {
         const userId = req.user._id;
         const { productId } = req.body;
 
-        console.log("USER ID:", userId);
-        console.log("PRODUCT ID:", productId);
 
         // 🔥 get product
         const product = await Product.findById(productId);
@@ -166,7 +161,6 @@ const addToCart = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error);
         return res.status(500).json({
             success: false,
             message: error.message
@@ -240,8 +234,6 @@ const removeFromCart = async (req, res) => {
             });
         }
 
-        console.log("USER ID:", userId);
-        console.log("PRODUCT ID:", productId);
 
         let cart = await Cart.findOne({ userId });
 
@@ -287,7 +279,6 @@ const removeFromCart = async (req, res) => {
         });
 
     } catch (error) {
-        console.log(error);
         return res.status(500).json({
             success: false,
             message: error.message

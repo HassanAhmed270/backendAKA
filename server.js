@@ -117,7 +117,6 @@ app.get('/verify-email/:token', async (req, res) => {
     `);
 
   } catch (error) {
-    console.error('Email verification error:', error);
     res.status(400).send(`
       <!DOCTYPE html>
       <html>
@@ -157,5 +156,4 @@ app.get('/', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
 });

@@ -17,12 +17,9 @@ const mailConfiguration = {
  };
  transporter.sendMail(mailConfiguration, function (error, info) {
     if (error) {
-        console.error("Email sending failed:", error);
         return;
     }
 
-    console.log("Email Sent Successfully");
-    console.log(info.response);
 });
 }
 
