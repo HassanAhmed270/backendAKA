@@ -4,21 +4,22 @@ const {register, reVerify,login, logout, forgotPassword,verifyOTP,changePassword
 const {auth,isAdmin}=require('../middleware/isAuthenticated.js');
 const { allUsers } = require('../controller/adminControl.js');
 const { singleUpload } = require('../middleware/multer.js');
-console.log("User routes loaded..."); // ✅ keep log here
+console.log("User routes loaded...");
 
-router.post('/register', register); // ✅ correct handler
-router.post('/login', login); // ✅ correct handler
-router.post('/logout',auth, logout); // ✅ correct handler
-router.post('/reVerify', reVerify); // ✅ correct handler
-router.post('/forgot-password', forgotPassword); // ✅ correct handler
-router.post('/verify-otp/:email', verifyOTP); // ✅ correct handler
-router.post('/change-password/:email', changePassword); // ✅ correct handler
-router.get('/get-user/:userId', getUserById); // ✅ correct handler
-router.put('/update/:id', auth,singleUpload,updateUser); // ✅ correct handler
+router.post('/register', register);
+router.post('/login', login);
+router.post('/logout',auth, logout);
+router.post('/reVerify', reVerify);
+router.post('/forgot-password', forgotPassword);
+router.post('/verify-otp/:email', verifyOTP);          // now returns a one-time resetToken
+router.post('/change-password/:email', changePassword); // now REQUIRES that resetToken
+router.put('/update/:id', auth,singleUpload,updateUser);
 
+// B1 (AB-004): was public. Only used by the admin UserInfo page, so admin-only.
+router.get('/get-user/:userId', auth, isAdmin, getUserById);
 
 // Admin Case  Special
-router.get('/all-users',auth,isAdmin, allUsers); // ✅ correct handler
+router.get('/all-users',auth,isAdmin, allUsers);
 
 router.put('/convert-to-worker/:userId', auth, isAdmin, convertToWorker);
 router.put('/remove-worker-role/:userId', auth, isAdmin, removeWorkerRole);

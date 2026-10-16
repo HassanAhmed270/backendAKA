@@ -1,27 +1,22 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const verifyEmail=(token, email, frontendUrl, backendUrl)=>{
+// B1 (AB-009): returns a promise instead of silently swallowing errors.
+const verifyEmail = async (token, email, frontendUrl, backendUrl) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // You can use 'hotmail', 'yahoo', etc.
+    service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // your email
-        pass: process.env.EMAIL_PASS  // app password if using Gmail
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
-});
-const mailConfiguration = {
-            from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
-            to:       email,
-            subject:  `Email Verification`,
-            text:     `Click this link to verify your email: ${backendUrl}/verify-email/${token}   ThankYou!`
- };
- transporter.sendMail(mailConfiguration, function (error, info) {
-    if (error) {
-        return;
-    }
+  });
 
-});
-}
-
+  await transporter.sendMail({
+    from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `Email Verification`,
+    text: `Click this link to verify your email: ${backendUrl}/verify-email/${token}   ThankYou!`
+  });
+};
 
 module.exports = verifyEmail;

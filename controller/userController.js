@@ -4,24 +4,25 @@ const User = require('../models/userModel.js');
 const Session = require('../models/sessionModel.js');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const cloudinary = require("../utils/cloudinary");
 
 // Get frontend URL from environment
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PREVIEW_URL || "http://localhost:5173";
-const BACKEND_URL = "https://backender-gphtczb2gxdrbrfz.canadaeast-01.azurewebsites.net";
-// ================= IMPORTS =================
+const BACKEND_URL = "https://backendaka.onrender.com";
+
+// B1 constants
+const ALLOWED_ROLES = ["user", "worker", "admin"];
+const MAX_OTP_ATTEMPTS = 5;
+const RESET_TOKEN_TTL_MS = 10 * 60 * 1000;
+const sha256 = (value) => crypto.createHash("sha256").update(String(value)).digest("hex");
 
 // ================= REGISTER =================
 const register = async (req, res) => {
-    
-    const { firstName, lastName, email, password, role } = req.body;
-    // 🔒 default role
-    let finalRole = "user";
-    
-    // ✅ agar role pass ho aur logged-in user admin ho
-    if (role){
-       finalRole = role;
-    };
+
+    // B1 (AB-001): `role` from the request body is IGNORED. Public signup is always "user".
+    const { firstName, lastName, email, password } = req.body;
+    const finalRole = "user";
 
     if (!firstName || !lastName || !email || !password) {
         return res.status(400).json({
@@ -54,7 +55,7 @@ const register = async (req, res) => {
             lastName,
             email,
             password: hashedPassword,
-            role: finalRole // ✅ use this
+            role: finalRole
         });
 
         const token = jwt.sign(
@@ -66,12 +67,21 @@ const register = async (req, res) => {
         newUser.token = token;
         await newUser.save();
 
-        await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
+        // B1 (AB-009): mail failure is now reported instead of silently ignored
+        try {
+            await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
+        } catch (mailError) {
+            console.error("Verification email failed:", mailError.message);
+            return res.status(502).json({
+                success: false,
+                message: "Account created, but the verification email could not be sent. Press Signup again and use 'Re-verify Your Account'."
+            });
+        }
 
         return res.status(201).json({
             success: true,
             message: "User Created Successfully. Please verify your email.",
-            user: newUser
+            user: newUser // password/otp/token stripped by schema toJSON (AB-005)
         });
 
     } catch (error) {
@@ -116,10 +126,18 @@ const reVerify = async (req, res) => {
             { expiresIn: '10m' }
         );
 
-        await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
-
         user.token = token;
         await user.save();
+
+        try {
+            await verifyEmail(token, email, FRONTEND_URL, BACKEND_URL);
+        } catch (mailError) {
+            console.error("Re-verification email failed:", mailError.message);
+            return res.status(502).json({
+                success: false,
+                message: "Could not send the verification email. Please try again later."
+            });
+        }
 
         return res.status(200).json({
             success: true,
@@ -194,7 +212,7 @@ const login = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: `Login Successful, Welcome Back ${existingUser.firstName}`,
-            user: existingUser,
+            user: existingUser, // secrets stripped by schema toJSON (AB-005)
             accessToken
         });
 
@@ -237,11 +255,13 @@ const logout = async (req, res) => {
         });
     }
 };
+
+// ================= FORGOT PASSWORD (step 1: send OTP) =================
 const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
 
-        if (!email) {
+        if (!email || typeof email !== "string") {
             return res.status(400).json({
                 success: false,
                 message: "Email is required"
@@ -262,10 +282,22 @@ const forgotPassword = async (req, res) => {
 
         user.otp = otp;
         user.otpExpiry = otpExpiry;
+        user.otpAttempts = 0;
+        user.resetTokenHash = null;
+        user.resetTokenExpiry = null;
 
         await user.save();
 
-        await sendOTPMail(otp, email);
+        // B1 (AB-009): await + handle mail errors (no process crash)
+        try {
+            await sendOTPMail(otp, email);
+        } catch (mailError) {
+            console.error("OTP email failed:", mailError.message);
+            return res.status(502).json({
+                success: false,
+                message: "Could not send the OTP email. Please try again later."
+            });
+        }
 
         return res.status(200).json({
             success: true,
@@ -280,6 +312,7 @@ const forgotPassword = async (req, res) => {
     }
 };
 
+// ================= FORGOT PASSWORD (step 2: verify OTP -> resetToken) =================
 const verifyOTP = async (req, res) => {
     try {
         const { otp } = req.body;
@@ -315,21 +348,43 @@ const verifyOTP = async (req, res) => {
             });
         }
 
-        if (otp !== user.otp) {
+        if (String(otp) !== user.otp) {
+            // B1 (AB-003): limit wrong guesses so the 6-digit OTP can't be brute-forced
+            user.otpAttempts = (user.otpAttempts || 0) + 1;
+
+            if (user.otpAttempts >= MAX_OTP_ATTEMPTS) {
+                user.otp = null;
+                user.otpExpiry = null;
+                user.otpAttempts = 0;
+                await user.save();
+                return res.status(400).json({
+                    success: false,
+                    message: "Too many incorrect attempts. Please request a new OTP"
+                });
+            }
+
+            await user.save();
             return res.status(400).json({
                 success: false,
                 message: "OTP is Invalid"
             });
         }
 
+        // OTP correct: consume it and issue a single-use reset token (stored hashed)
+        const resetToken = crypto.randomBytes(32).toString("hex");
+
         user.otp = null;
         user.otpExpiry = null;
+        user.otpAttempts = 0;
+        user.resetTokenHash = sha256(resetToken);
+        user.resetTokenExpiry = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
         await user.save();
 
         return res.status(200).json({
             success: true,
-            message: "OTP Verified Successfully!"
+            message: "OTP Verified Successfully!",
+            resetToken
         });
 
     } catch (error) {
@@ -340,34 +395,59 @@ const verifyOTP = async (req, res) => {
     }
 };
 
+// ================= FORGOT PASSWORD (step 3: set new password, needs resetToken) =================
 const changePassword = async (req, res) => {
     try {
-        const { newPassword, confirmPassword } = req.body;
+        const { newPassword, confirmPassword, resetToken } = req.body;
         const { email } = req.params;
-        const user = await User.findOne({ email });
 
-        if (!user) {
-            return res.status(400).json({
-                success: false,
-                message: "User Not Found"
-            });
-        }
         if (!newPassword || !confirmPassword) {
             return res.status(400).json({
                 success: false,
                 message: "Password is required"
             });
         }
-        if (newPassword != confirmPassword) {
+        if (newPassword !== confirmPassword) {
             return res.status(400).json({
                 success: false,
                 message: "Password Donot Match"
             });
         }
-        // Hash password
-        const hashedPassword = await bcrypt.hash(newPassword, 10);
-        user.password = hashedPassword;
+        if (String(newPassword).length < 8) {
+            return res.status(400).json({
+                success: false,
+                message: "Password must be at least 8 characters"
+            });
+        }
+
+        const user = await User.findOne({ email });
+
+        // B1 (AB-003): same generic error for every failure so nothing is revealed
+        const invalidSession = () => res.status(400).json({
+            success: false,
+            message: "Reset session is invalid or expired. Please request a new OTP."
+        });
+
+        if (
+            !user ||
+            !resetToken ||
+            !user.resetTokenHash ||
+            !user.resetTokenExpiry ||
+            user.resetTokenExpiry < new Date() ||
+            sha256(resetToken) !== user.resetTokenHash
+        ) {
+            return invalidSession();
+        }
+
+        user.password = await bcrypt.hash(newPassword, 10);
+
+        // single use + sign out everywhere
+        user.resetTokenHash = null;
+        user.resetTokenExpiry = null;
+        user.sessionVersion += 1;
+        user.isLoggedIn = false;
         await user.save();
+        await Session.deleteMany({ user: user._id });
 
         return res.status(200).json({
             success: true,
@@ -385,7 +465,8 @@ const changePassword = async (req, res) => {
 const getUserById = async (req, res) => {
     try {
         const { userId } = req.params;
-        const user = await User.findById(userId).select("-password,-otp, -otpExpiry -token");
+        // B1 (AB-004): fixed select string (was comma-separated, so nothing was excluded)
+        const user = await User.findById(userId).select("-password -otp -otpExpiry -otpAttempts -token -resetTokenHash -resetTokenExpiry");
         if (!user) {
             return res.status(400).json({
                 success: false,
@@ -478,6 +559,17 @@ const updateUser = async (req, res) => {
             });
         }
 
+        // B1 (AB-002): role may only be changed by an admin, never on yourself.
+        // For everyone else the `role` field is silently ignored.
+        const isAdmin = loggedInUser.role === "admin";
+        const isSelf = loggedInUser._id.toString() === userIdToUpdate;
+        if (role && isAdmin && !isSelf && !ALLOWED_ROLES.includes(role)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid role"
+            });
+        }
+
         let user = await User.findById(userIdToUpdate);
 
         if (!user) {
@@ -520,7 +612,10 @@ const updateUser = async (req, res) => {
         user.city = city || user.city;
         user.zipCode = zipCode || user.zipCode;
         user.phoneNo = phoneNo || user.phoneNo;
-        user.role = role || user.role;
+
+        if (role && isAdmin && !isSelf) {
+            user.role = role;
+        }
 
         user.profilePic = profilePicUrl;
         user.profilePicPublicId = profilePicPublicId;
@@ -530,7 +625,7 @@ const updateUser = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
-            user: updatedUser
+            user: updatedUser // secrets stripped by schema toJSON (AB-005)
         });
 
     } catch (error) {

@@ -1,24 +1,23 @@
 const nodemailer = require('nodemailer');
 require('dotenv').config();
 
-const sentOTPMail=(otp, email)=>{
+// B1 (AB-009): returns a promise; callers must await it inside try/catch.
+// Previously it threw inside the sendMail callback, which could crash the process.
+const sentOTPMail = async (otp, email) => {
   const transporter = nodemailer.createTransport({
-    service: 'gmail', // You can use 'hotmail', 'yahoo', etc.
+    service: 'gmail',
     auth: {
-        user: process.env.EMAIL_USER, // your email
-        pass: process.env.EMAIL_PASS  // app password if using Gmail
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS
     }
-});
-const mailConfiguration = {
-            from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
-            to:       email,
-            subject:  `PASSWORD RESET OTP`,
-            html:     `This is your OTP<b> ${otp}</b>`
- };
- transporter.sendMail(mailConfiguration, function(error,info){
-    if(error){throw Error(error)}
- })
-}
+  });
 
+  await transporter.sendMail({
+    from: `"AKA WMart :" <${process.env.EMAIL_USER}>`,
+    to: email,
+    subject: `PASSWORD RESET OTP`,
+    html: `This is your OTP<b> ${otp}</b>`
+  });
+};
 
 module.exports = sentOTPMail;

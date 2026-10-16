@@ -59,6 +59,19 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    // B1 (AB-003): wrong-OTP counter + single-use reset token (stored hashed)
+    otpAttempts: {
+        type: Number,
+        default: 0
+    },
+    resetTokenHash: {
+        type: String,
+        default: null
+    },
+    resetTokenExpiry: {
+        type: Date,
+        default: null
+    },
     address: {
         type: String,
     },
@@ -72,7 +85,22 @@ const userSchema = new mongoose.Schema({
         type: String,
     }
 },
-    { timestamps: true }
+    {
+        timestamps: true,
+        // B1 (AB-004/005): never serialize secrets, in ANY res.json(user / users)
+        toJSON: {
+            transform: (doc, ret) => {
+                delete ret.password;
+                delete ret.otp;
+                delete ret.otpExpiry;
+                delete ret.otpAttempts;
+                delete ret.token;
+                delete ret.resetTokenHash;
+                delete ret.resetTokenExpiry;
+                return ret;
+            }
+        }
+    }
 );
 
 const User = mongoose.model('User', userSchema);
