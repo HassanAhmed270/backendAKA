@@ -72,6 +72,47 @@ const auth = async (req, res, next) => {
     }
 };
 
+// Optional authentication: used where guests are allowed (e.g. checkout).
+// - valid token  -> req.user is set (order is linked to the account)
+// - no token / invalid / expired token -> request continues as a guest
+const optionalAuth = async (req, res, next) => {
+    try {
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+            return next();
+        }
+
+        const token = authHeader.split(" ")[1];
+
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.SECRET_KEY);
+        } catch {
+            return next();
+        }
+
+        if (!decoded || !decoded.id) {
+            return next();
+        }
+
+        const user = await User.findById(decoded.id);
+
+        if (
+            user &&
+            decoded.sessionVersion &&
+            decoded.sessionVersion === user.sessionVersion
+        ) {
+            req.user = user;
+        }
+
+        return next();
+
+    } catch {
+        return next();
+    }
+};
+
 const isAdmin = async (req, res, next) => {
     try {
 
@@ -117,6 +158,7 @@ const isAdminOrWorker = async (req, res, next) => {
 
 module.exports = {
     auth,
+    optionalAuth,
     isAdmin,
     isAdminOrWorker
 };

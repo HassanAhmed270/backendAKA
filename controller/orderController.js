@@ -1,33 +1,136 @@
+const crypto = require("crypto");
 const Order = require("../models/orderModel");
 const Cart = require("../models/cartModel");
 const User = require("../models/userModel");
 const Product = require("../models/productModel");
 
+// ================= ORDER POLICY (single source of truth) =================
+// Max units of one product in one order.
+const MAX_QTY_PER_PRODUCT = 5;
+// Technical safety limit on distinct product lines in one request.
+const MAX_ORDER_LINES = 50;
+// Shipping is negotiated with the buyer over WhatsApp before the order is
+// confirmed, so NO shipping fee is calculated or added automatically.
+const SHIPPING_POLICY = {
+  autoCharge: 0, // PKR
+};
+// Only these customer-detail fields are stored, as trimmed strings.
+const DETAIL_FIELDS = ["fullName", "phone", "email", "address", "city", "state", "zip", "country"];
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
+
+const sanitizeDetails = (details) => {
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return {};
+  }
+  const clean = {};
+  for (const key of DETAIL_FIELDS) {
+    const value = details[key];
+    if (typeof value === "string") {
+      clean[key] = value.trim().slice(0, 200);
+    }
+  }
+  return clean;
+};
+
+// Returns { qtyById } or { error }
+const parseOrderLines = (products) => {
+  if (!Array.isArray(products) || products.length === 0) {
+    return { error: "Order must contain at least one product" };
+  }
+  if (products.length > MAX_ORDER_LINES) {
+    return { error: "Too many products in one order" };
+  }
+
+  const qtyById = new Map();
+
+  for (const line of products) {
+    const id = line && line.productId;
+    const qty = line && line.quantity;
+
+    if (typeof id !== "string" || !OBJECT_ID_REGEX.test(id)) {
+      return { error: "Invalid product id" };
+    }
+    if (typeof qty !== "number" || !Number.isInteger(qty) || qty < 1 || qty > MAX_QTY_PER_PRODUCT) {
+      return { error: `Quantity must be a whole number between 1 and ${MAX_QTY_PER_PRODUCT}` };
+    }
+
+    const key = id.toLowerCase();
+    qtyById.set(key, (qtyById.get(key) || 0) + qty);
+  }
+
+  for (const total of qtyById.values()) {
+    if (total > MAX_QTY_PER_PRODUCT) {
+      return { error: `Maximum ${MAX_QTY_PER_PRODUCT} units per product per order` };
+    }
+  }
+
+  return { qtyById };
+};
+
 // 🟢 CREATE ORDER
+// Prices and totals are computed here from the database. Any amount,
+// shipping, currency or paymentMethod sent by the client is ignored.
 const createOrder = async (req, res) => {
   try {
-    const { products, amount, shipping, currency, Details, paymentMethod } = req.body;
+    const { products, Details } = req.body;
 
-    const paymentOrderId = "JC_" + Date.now();
+    const parsed = parseOrderLines(products);
+    if (parsed.error) {
+      return res.status(400).json({ success: false, message: parsed.error });
+    }
 
-    const jazzcashOrder = {
+    const ids = [...parsed.qtyById.keys()];
+    const dbProducts = await Product.find({ _id: { $in: ids } }).select("productPrice");
+
+    if (dbProducts.length !== ids.length) {
+      return res.status(400).json({
+        success: false,
+        message: "One or more products are no longer available",
+      });
+    }
+
+    let subtotal = 0;
+    const orderProducts = [];
+
+    for (const product of dbProducts) {
+      const price = Number(product.productPrice);
+      if (!Number.isFinite(price) || price < 0) {
+        return res.status(400).json({
+          success: false,
+          message: "One or more products have an invalid price",
+        });
+      }
+      const quantity = parsed.qtyById.get(product._id.toString());
+      subtotal += price * quantity;
+      orderProducts.push({ productId: product._id, quantity });
+    }
+
+    const amount = subtotal;
+    const shipping = SHIPPING_POLICY.autoCharge;
+    const currency = "PKR";
+    const details = sanitizeDetails(Details);
+
+    // Random, unguessable order reference
+    const paymentOrderId = "ORD_" + crypto.randomBytes(12).toString("hex");
+
+    const paymentOrder = {
       id: paymentOrderId,
-      amount: Math.round(Number(amount) * 100),
-      currency: currency || "PKR",
+      amount: Math.round(amount * 100),
+      currency,
       status: "created",
     };
 
     const newOrder = new Order({
       user: req.user ? req.user._id : null,
-      guestDetails: req.user ? null : Details || null,
-      products,
+      guestDetails: req.user ? null : details,
+      products: orderProducts,
       amount,
       shipping,
       currency,
       status: "Pending",
-      paymentMethod: paymentMethod || "JazzCash",
+      paymentMethod: "COD",
       paymentOrderId,
-      Details: Details || null,
+      Details: details,
     });
 
     await newOrder.save();
@@ -35,7 +138,7 @@ const createOrder = async (req, res) => {
     res.json({
       success: true,
       message: "Order created",
-      order: jazzcashOrder,
+      order: paymentOrder,
       dbOrder: newOrder,
     });
 
@@ -48,7 +151,7 @@ const createOrder = async (req, res) => {
 };
 
 
-// 🟢 VERIFY PAYMENT
+// 🟢 VERIFY PAYMENT (route is admin-only)
 const verifyPayment = async (req, res) => {
   try {
 
@@ -236,15 +339,38 @@ const getAllOrders = async (req, res) => {
     });
   }
 };
+
+// 🟢 WHATSAPP INQUIRY
+// Behaviour is unchanged (returns a WhatsApp URL), but only the order's owner
+// or an admin/worker may use it. Everyone else gets "Order not found" so
+// order ids cannot be probed.
 const inquiryOrder = async (req, res) => {
   try {
     const { orderId } = req.body;
+
+    if (typeof orderId !== "string" || !OBJECT_ID_REGEX.test(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid order id"
+      });
+    }
 
     const order = await Order.findById(orderId)
       .populate("user", "firstName lastName email")
       .populate("products.productId", "productName");
 
     if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: "Order not found"
+      });
+    }
+
+    const isStaff = req.user.role === "admin" || req.user.role === "worker";
+    const ownerId = order.user?._id?.toString();
+    const requesterId = req.user._id.toString();
+
+    if (!isStaff && ownerId !== requesterId) {
       return res.status(404).json({
         success: false,
         message: "Order not found"

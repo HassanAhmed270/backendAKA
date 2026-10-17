@@ -12,14 +12,14 @@ const {
   updateOrderStatus,
 } = require("../controller/orderController.js");
 
-const { auth ,isAdmin,isAdminOrWorker} = require("../middleware/isAuthenticated.js");
+const { auth, optionalAuth, isAdmin, isAdminOrWorker } = require("../middleware/isAuthenticated.js");
 
 
-// 🟢 CREATE ORDER
-router.post("/create", createOrder);
+// 🟢 CREATE ORDER (guests allowed; logged-in customers get the order linked to their account)
+router.post("/create", optionalAuth, createOrder);
 
-// 🟢 VERIFY PAYMENT
-router.post("/verify", verifyPayment);
+// 🟢 VERIFY PAYMENT (admin only; COD is the only live payment method)
+router.post("/verify", auth, isAdmin, verifyPayment);
 router.get("/get-my-order", auth, getMyOrder);
 router.put("/update-status/:orderId", auth, isAdminOrWorker, updateOrderStatus);
 router.get("/user-order/:userId", auth, isAdminOrWorker ,getUserOrders);
