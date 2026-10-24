@@ -2,6 +2,9 @@ const verifyEmail = require('../emailVerify/verifyEmail.js');
 const sendOTPMail = require('../emailVerify/sentOTPMail.js');
 const User = require('../models/userModel.js');
 const Session = require('../models/sessionModel.js');
+const normalizeEmail = (v) => (typeof v === "string" ? v.trim().toLowerCase() : "");
+const findUserByEmail = (email) =>
+    User.findOne({ email }).collation({ locale: "en", strength: 2 });
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -21,7 +24,8 @@ const sha256 = (value) => crypto.createHash("sha256").update(String(value)).dige
 const register = async (req, res) => {
 
     // B1 (AB-001): `role` from the request body is IGNORED. Public signup is always "user".
-    const { firstName, lastName, email, password } = req.body;
+    const { firstName, lastName, password } = req.body;
+    const email = normalizeEmail(req.body.email);
     const finalRole = "user";
 
     if (!firstName || !lastName || !email || !password) {
@@ -32,7 +36,7 @@ const register = async (req, res) => {
     }
 
     try {
-        const existingUser = await User.findOne({ email });
+        const existingUser = await findUserByEmail(email);
 
         if (existingUser) {
             if (!existingUser.isVerified) {
@@ -95,7 +99,7 @@ const register = async (req, res) => {
 // ================= RE-VERIFY EMAIL =================
 const reVerify = async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = normalizeEmail(req.body.email);
 
         if (!email) {
             return res.status(400).json({
@@ -104,7 +108,7 @@ const reVerify = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
 
         if (!user) {
             return res.status(400).json({
@@ -153,7 +157,8 @@ const reVerify = async (req, res) => {
 };
 
 const login = async (req, res) => {
-    const { email, password } = req.body;
+    const { password } = req.body;
+    const email = normalizeEmail(req.body.email);
 
     if (!email || !password) {
         return res.status(400).json({
@@ -163,7 +168,7 @@ const login = async (req, res) => {
     }
 
     try {
-        const existingUser = await User.findOne({ email });
+        const existingUser = await findUserByEmail(email);
 
         if (!existingUser) {
             return res.status(400).json({
@@ -259,7 +264,7 @@ const logout = async (req, res) => {
 // ================= FORGOT PASSWORD (step 1: send OTP) =================
 const forgotPassword = async (req, res) => {
     try {
-        const { email } = req.body;
+        const email = normalizeEmail(req.body.email);
 
         if (!email || typeof email !== "string") {
             return res.status(400).json({
@@ -268,7 +273,7 @@ const forgotPassword = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
 
         if (!user) {
             return res.status(400).json({
@@ -316,7 +321,7 @@ const forgotPassword = async (req, res) => {
 const verifyOTP = async (req, res) => {
     try {
         const { otp } = req.body;
-        const { email } = req.params;
+        const email = normalizeEmail(req.params.email);
 
         if (!email || !otp) {
             return res.status(400).json({
@@ -325,7 +330,7 @@ const verifyOTP = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
 
         if (!user) {
             return res.status(400).json({
@@ -399,9 +404,9 @@ const verifyOTP = async (req, res) => {
 const changePassword = async (req, res) => {
     try {
         const { newPassword, confirmPassword, resetToken } = req.body;
-        const { email } = req.params;
+        const email = normalizeEmail(req.params.email);
 
-        if (!newPassword || !confirmPassword) {
+        if (!email || !newPassword || !confirmPassword) {
             return res.status(400).json({
                 success: false,
                 message: "Password is required"
@@ -420,7 +425,7 @@ const changePassword = async (req, res) => {
             });
         }
 
-        const user = await User.findOne({ email });
+        const user = await findUserByEmail(email);
 
         // B1 (AB-003): same generic error for every failure so nothing is revealed
         const invalidSession = () => res.status(400).json({
@@ -579,17 +584,11 @@ const updateUser = async (req, res) => {
             });
         }
 
-        let profilePicUrl = user.profilePic;
-        let profilePicPublicId = user.profilePicPublicId;
+        const oldPicId = user.profilePicId;
 
-        // Upload new image
+        let uploadResult;
         if (req.file) {
-            // delete old image
-            if (profilePicPublicId) {
-                await cloudinary.uploader.destroy(profilePicPublicId);
-            }
-
-            const uploadResult = await new Promise((resolve, reject) => {
+            uploadResult = await new Promise((resolve, reject) => {
                 const stream = cloudinary.uploader.upload_stream(
                     { folder: "profiles" },
                     (error, result) => {
@@ -600,9 +599,6 @@ const updateUser = async (req, res) => {
 
                 stream.end(req.file.buffer);
             });
-
-            profilePicUrl = uploadResult.secure_url;
-            profilePicPublicId = uploadResult.public_id;
         }
 
         // Update fields
@@ -617,10 +613,20 @@ const updateUser = async (req, res) => {
             user.role = role;
         }
 
-        user.profilePic = profilePicUrl;
-        user.profilePicPublicId = profilePicPublicId;
+        if (uploadResult) {
+            user.profilePic = uploadResult.secure_url;
+            user.profilePicId = uploadResult.public_id;
+        }
 
         const updatedUser = await user.save();
+
+        if (uploadResult && oldPicId && uploadResult.public_id !== oldPicId) {
+            try {
+                await cloudinary.uploader.destroy(oldPicId);
+            } catch (error) {
+                console.error("Failed to delete old profile image from Cloudinary:", error);
+            }
+        }
 
         return res.status(200).json({
             success: true,

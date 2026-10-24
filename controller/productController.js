@@ -2,6 +2,8 @@ const getDataUri = require("../utils/dataUri");
 const cloudinary = require("../utils/cloudinary");
 const Product = require('../models/productModel.js');
 
+const MAX_PRODUCT_PRICE = 10000;
+
 const parseWholeNumber = (value) => {
     if (value === undefined || value === null || (typeof value === "string" && value.trim() === "")) {
         return 0;
@@ -31,10 +33,10 @@ const addNewProduct = async (req, res) => {
         }
 
         const parsedProductPrice = Number(productPrice);
-        if (!Number.isFinite(parsedProductPrice) || parsedProductPrice <= 0) {
+        if (!Number.isFinite(parsedProductPrice) || parsedProductPrice < 1 || parsedProductPrice > MAX_PRODUCT_PRICE) {
             return res.status(400).json({
                 success: false,
-                message: "Product price must be a finite number greater than 0"
+                message: "Price must be between 1 and 10000 PKR"
             });
         }
 
@@ -171,10 +173,10 @@ const updateProduct = async (req, res) => {
         let parsedProductPrice;
         if (Object.prototype.hasOwnProperty.call(req.body, "productPrice")) {
             parsedProductPrice = Number(productPrice);
-            if (!Number.isFinite(parsedProductPrice) || parsedProductPrice <= 0) {
+            if (!Number.isFinite(parsedProductPrice) || parsedProductPrice < 1 || parsedProductPrice > MAX_PRODUCT_PRICE) {
                 return res.status(400).json({
                     success: false,
-                    message: "Product price must be a finite number greater than 0"
+                    message: "Price must be between 1 and 10000 PKR"
                 });
             }
         }
