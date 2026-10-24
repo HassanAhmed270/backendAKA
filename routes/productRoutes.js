@@ -4,9 +4,22 @@ const {getAllProduct,addNewProduct,deleteProduct,updateProduct} =require('../con
 const {auth,isAdmin,isAdminOrWorker}=require('../middleware/isAuthenticated.js');
 const { multipleUpload } = require('../middleware/multer.js');
 
-router.post('/add',auth ,isAdminOrWorker, multipleUpload, addNewProduct ); // ✅ correct handler
+const uploadProductImages = (req, res, next) => {
+    multipleUpload(req, res, (error) => {
+        if (error) {
+            return res.status(400).json({
+                success: false,
+                message: "Maximum 5 images allowed"
+            });
+        }
+
+        next();
+    });
+};
+
+router.post('/add',auth ,isAdminOrWorker, uploadProductImages, addNewProduct ); // ✅ correct handler
 router.post('/delete/:productId',auth,isAdminOrWorker,deleteProduct);
-router.put('/update/:productId',auth,isAdminOrWorker,multipleUpload,updateProduct);
+router.put('/update/:productId',auth,isAdminOrWorker,uploadProductImages,updateProduct);
 router.get('/get-all-products', getAllProduct); // ✅ correct handler
 
 module.exports = router;

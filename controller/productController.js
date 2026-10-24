@@ -1,39 +1,72 @@
 const getDataUri = require("../utils/dataUri");
 const cloudinary = require("../utils/cloudinary");
 const Product = require('../models/productModel.js');
+
+const parseWholeNumber = (value) => {
+    if (value === undefined || value === null || (typeof value === "string" && value.trim() === "")) {
+        return 0;
+    }
+
+    const number = Number(value);
+    return Number.isInteger(number) ? number : null;
+};
+
 const addNewProduct = async (req, res) => {
     try {
         const { productName, productDescription, productPrice, category, brand } = req.body;
-        const userId = req.id;
-        if (!productName || !productDescription || !productPrice || !category || !brand) {
+        const userId = req.user._id;
+        if (!productName || !productDescription || !category || !brand) {
             return res.status(400).json({
                 success: false,
                 message: "All Fields are Required"
             })
         }
-        let productImg = [];
-        if (req.files && req.files.length > 0) {
-            for (const file of req.files) {
-                const fileUri = getDataUri(file);
-                const result = await cloudinary.uploader.upload(fileUri, {
-                    folder: "ekart_products"
-                });
 
-                productImg.push({
-                    url: result.secure_url,
-                    public_id: result.public_id
-                })
-            }
+        const quantity = parseWholeNumber(req.body.quantity);
+        if (quantity === null || quantity < 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Quantity must be a whole number of 0 or more"
+            });
+        }
+
+        const parsedProductPrice = Number(productPrice);
+        if (!Number.isFinite(parsedProductPrice) || parsedProductPrice <= 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Product price must be a finite number greater than 0"
+            });
+        }
+
+        if (!Array.isArray(req.files) || req.files.length < 1 || req.files.length > 5) {
+            return res.status(400).json({
+                success: false,
+                message: "1 to 5 images are required"
+            });
+        }
+
+        let productImg = [];
+        for (const file of req.files) {
+            const fileUri = getDataUri(file);
+            const result = await cloudinary.uploader.upload(fileUri, {
+                folder: "ekart_products"
+            });
+
+            productImg.push({
+                url: result.secure_url,
+                public_id: result.public_id
+            })
         }
 
         const newProduct = await Product.create({
             userId,
             productName,
             productDescription,
-            productPrice,
+            productPrice: parsedProductPrice,
             category,
             brand,
             productImg,
+            stock: quantity
         })
         return res.status(200).json({
             success: true,
@@ -105,7 +138,46 @@ const getAllProduct = async (req, res) => {
 const updateProduct = async (req, res) => {
     try {
         const { productId } = req.params;
-        const { productName, productDescription, productPrice, category, brand, existingImages } = req.body;
+        const { productName, productDescription, productPrice, category, brand } = req.body;
+
+        let keepIds;
+        const hasExistingImages = Object.prototype.hasOwnProperty.call(req.body, "existingImages");
+        if (hasExistingImages) {
+            try {
+                keepIds = JSON.parse(req.body.existingImages);
+            } catch (error) {
+                return res.status(400).json({
+                    success: false,
+                    message: "existingImages must be a valid JSON array"
+                });
+            }
+
+            if (!Array.isArray(keepIds)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "existingImages must be a valid JSON array"
+                });
+            }
+        }
+
+        const quantityDelta = parseWholeNumber(req.body.quantity);
+        if (quantityDelta === null) {
+            return res.status(400).json({
+                success: false,
+                message: "Quantity must be a whole number"
+            });
+        }
+
+        let parsedProductPrice;
+        if (Object.prototype.hasOwnProperty.call(req.body, "productPrice")) {
+            parsedProductPrice = Number(productPrice);
+            if (!Number.isFinite(parsedProductPrice) || parsedProductPrice <= 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Product price must be a finite number greater than 0"
+                });
+            }
+        }
 
         const product = await Product.findById(productId);
         if (!product) {
@@ -115,53 +187,63 @@ const updateProduct = async (req, res) => {
             });
         }
 
-        let updatedImages = [];
+        const currentImages = product.productImg || [];
+        const keptImages = hasExistingImages
+            ? currentImages.filter((img) => keepIds.includes(img.public_id))
+            : currentImages;
+        const removedImages = hasExistingImages
+            ? currentImages.filter((img) => !keepIds.includes(img.public_id))
+            : [];
+        const newFiles = req.files || [];
 
-        if (existingImages) {
-            const keepIds = JSON.parse(existingImages);
-
-            // keep selected images
-            updatedImages = product.productImg.filter((img) =>
-                keepIds.includes(img.public_id)
-            );
-
-            // remove unselected images
-            const removedImages = product.productImg.filter((img) =>
-                !keepIds.includes(img.public_id)
-            );
-
-            for (const img of removedImages) {
-                await cloudinary.uploader.destroy(img.public_id);
-            }
-
-        } else {
-            updatedImages = product.productImg;
+        if (keptImages.length + newFiles.length < 1 || keptImages.length + newFiles.length > 5) {
+            return res.status(400).json({
+                success: false,
+                message: "1 to 5 images are required"
+            });
         }
 
-        // upload new images
-        if (req.files && req.files.length > 0) {
-            for (const file of req.files) {
-                const fileUri = getDataUri(file);
-                const result = await cloudinary.uploader.upload(fileUri, {
-                    folder: "ekart_products"
-                });
+        const currentStock = product.stock || 0;
+        if (currentStock + quantityDelta < 0) {
+            return res.status(400).json({
+                success: false,
+                message: "Stock cannot go below 0"
+            });
+        }
 
-                updatedImages.push({
-                    url: result.secure_url,
-                    public_id: result.public_id
-                });
-            }
+        const uploadedImages = [];
+        for (const file of newFiles) {
+            const fileUri = getDataUri(file);
+            const result = await cloudinary.uploader.upload(fileUri, {
+                folder: "ekart_products"
+            });
+
+            uploadedImages.push({
+                url: result.secure_url,
+                public_id: result.public_id
+            });
         }
 
         // update fields
         product.productName = productName || product.productName;
         product.productDescription = productDescription || product.productDescription;
-        product.productPrice = productPrice || product.productPrice;
+        if (parsedProductPrice !== undefined) {
+            product.productPrice = parsedProductPrice;
+        }
         product.category = category || product.category;
         product.brand = brand || product.brand;
-        product.productImg = updatedImages;
+        product.productImg = [...keptImages, ...uploadedImages];
+        product.stock = currentStock + quantityDelta;
 
         await product.save();
+
+        for (const img of removedImages) {
+            try {
+                await cloudinary.uploader.destroy(img.public_id);
+            } catch (error) {
+                console.error("Failed to delete removed product image from Cloudinary:", error);
+            }
+        }
 
         return res.status(200).json({
             success: true,
