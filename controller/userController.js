@@ -9,7 +9,7 @@ const cloudinary = require("../utils/cloudinary");
 
 // Get frontend URL from environment
 const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PREVIEW_URL || "http://localhost:5173";
-const BACKEND_URL = "https://backendaka.onrender.com";
+const BACKEND_URL = (process.env.BACKEND_URL || "https://backendaka.onrender.com").replace(/\/$/, "");
 
 // B1 constants
 const ALLOWED_ROLES = ["user", "worker", "admin"];

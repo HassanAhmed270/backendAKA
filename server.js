@@ -11,14 +11,17 @@ require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 3000;
-// const FRONTEND_URL="https://aka-wmart.vercel.app"||process.env.FRONTEND_URL||process.env.PREVIEW_URL
-// const BACKEND_URL = "https://backendaka.onrender.com/"||
-const BACKEND_URL = "http://localhost:3000/"   
-const FRONTEND_URL = "https://aka-wmart.vercel.app"|| process.env.FRONTEND_URL || process.env.PREVIEW_URL ;
+const isProd = process.env.NODE_ENV === "production";
+const FRONTEND_URL = (process.env.FRONTEND_URL || "https://aka-wmart.vercel.app").replace(/\/$/, "");
+const allowedOrigins = [FRONTEND_URL, ...(isProd ? [] : ["http://localhost:5173"])];
 
 app.use(cors({
-  origin: FRONTEND_URL, credentials:true
-}))
+  origin(origin, cb) {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(null, false);
+  },
+  credentials: true,
+}));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
