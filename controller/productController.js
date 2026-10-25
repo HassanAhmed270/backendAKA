@@ -1,6 +1,7 @@
 const getDataUri = require("../utils/dataUri");
 const cloudinary = require("../utils/cloudinary");
 const Product = require('../models/productModel.js');
+const Cart = require("../models/cartModel");
 
 const MAX_PRODUCT_PRICE = 10000;
 
@@ -100,6 +101,11 @@ const deleteProduct = async (req, res) => {
         }
         //From Mongo db
         await Product.findByIdAndDelete(productId);
+        try {
+            await Cart.updateMany({}, { $pull: { items: { productId } } });
+        } catch (error) {
+            console.error("Failed to remove deleted product from carts:", error);
+        }
 
         return res.status(200).json({
             success: true,

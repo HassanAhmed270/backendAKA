@@ -173,7 +173,7 @@ const login = async (req, res) => {
         if (!existingUser) {
             return res.status(400).json({
                 success: false,
-                message: "User Not Exists"
+                message: "Invalid email or password"
             });
         }
 
@@ -182,7 +182,7 @@ const login = async (req, res) => {
         if (!isPasswordValid) {
             return res.status(400).json({
                 success: false,
-                message: "Username or password incorrect"
+                message: "Invalid email or password"
             });
         }
 
