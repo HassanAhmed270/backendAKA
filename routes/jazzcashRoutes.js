@@ -8,7 +8,7 @@ router.post("/create", async (req, res) => {
 
     const transactionId = "JC" + Date.now();
 
-    // fake session (use DB in real project)
+ 
     global.jazzcashSession = {
       transactionId,
       userId,
