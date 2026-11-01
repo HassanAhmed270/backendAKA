@@ -28,10 +28,17 @@ const register = async (req, res) => {
     const email = normalizeEmail(req.body.email);
     const finalRole = "user";
 
-    if (!firstName || !lastName || !email || !password) {
+    if (!firstName || !lastName || !email || typeof firstName !== "string" || typeof lastName !== "string") {
         return res.status(400).json({
             success: false,
             message: "All fields required!"
+        });
+    }
+
+    if (typeof password !== "string" || password.length < 8 || password.length > 72) {
+        return res.status(400).json({
+            success: false,
+            message: "Password must be 8 to 72 characters"
         });
     }
 
@@ -160,7 +167,7 @@ const login = async (req, res) => {
     const { password } = req.body;
     const email = normalizeEmail(req.body.email);
 
-    if (!email || !password) {
+    if (!email || !password || typeof password !== "string") {
         return res.status(400).json({
             success: false,
             message: "All fields required!"
@@ -282,7 +289,7 @@ const forgotPassword = async (req, res) => {
             });
         }
 
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = crypto.randomInt(100000, 1000000).toString();
         const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
 
         user.otp = otp;

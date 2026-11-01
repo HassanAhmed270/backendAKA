@@ -54,7 +54,7 @@ const orderSchema = new mongoose.Schema(
     // 🟢 PAYMENT INFO
     paymentMethod: {
       type: String,
-      default: "JazzCash",
+      default: "COD",
     },
 
     paymentOrderId: String,

@@ -13,10 +13,11 @@ const {
 } = require("../controller/orderController.js");
 
 const { auth, optionalAuth, isAdmin, isAdminOrWorker } = require("../middleware/isAuthenticated.js");
+const { orderLimiter } = require("../middleware/rateLimiters.js");
 
 
 // 🟢 CREATE ORDER (guests allowed; logged-in customers get the order linked to their account)
-router.post("/create", optionalAuth, createOrder);
+router.post("/create", orderLimiter, optionalAuth, createOrder);
 
 // 🟢 VERIFY PAYMENT (admin only; COD is the only live payment method)
 router.post("/verify", auth, isAdmin, verifyPayment);

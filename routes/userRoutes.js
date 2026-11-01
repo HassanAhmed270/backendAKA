@@ -4,15 +4,16 @@ const {register, reVerify,login, logout, forgotPassword,verifyOTP,changePassword
 const {auth,isAdmin}=require('../middleware/isAuthenticated.js');
 const { allUsers } = require('../controller/adminControl.js');
 const { singleUpload } = require('../middleware/multer.js');
+const { loginLimiter, signupLimiter, otpLimiter } = require('../middleware/rateLimiters.js');
 console.log("User routes loaded...");
 
-router.post('/register', register);
-router.post('/login', login);
+router.post('/register', signupLimiter, register);
+router.post('/login', loginLimiter, login);
 router.post('/logout',auth, logout);
-router.post('/reVerify', reVerify);
-router.post('/forgot-password', forgotPassword);
-router.post('/verify-otp/:email', verifyOTP);          // now returns a one-time resetToken
-router.post('/change-password/:email', changePassword); // now REQUIRES that resetToken
+router.post('/reVerify', signupLimiter, reVerify);
+router.post('/forgot-password', signupLimiter, forgotPassword);
+router.post('/verify-otp/:email', otpLimiter, verifyOTP);          // now returns a one-time resetToken
+router.post('/change-password/:email', otpLimiter, changePassword); // now REQUIRES that resetToken
 router.put('/update/:id', auth,singleUpload,updateUser);
 
 // B1 (AB-004): was public. Only used by the admin UserInfo page, so admin-only.

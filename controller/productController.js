@@ -124,9 +124,8 @@ const getAllProduct = async (req, res) => {
         const products = await Product.find();
 
         if (products.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: "No Products Available",
+            return res.status(200).json({
+                success: true,
                 products: []
             });
         }

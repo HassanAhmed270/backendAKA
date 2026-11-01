@@ -1,4 +1,5 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const connectDB = require('./database/db');
 const userRoutes = require('./routes/userRoutes.js');
 const productRoutes = require('./routes/productRoutes.js');
@@ -7,14 +8,18 @@ const orderRoutes=require('./routes/orderRoutes.js');
 const cors = require('cors')
 const jwt = require('jsonwebtoken');
 const User = require('./models/userModel.js');
+const helmet = require('helmet');
+const { apiLimiter } = require('./middleware/rateLimiters.js');
 require('dotenv').config();
 
 const app = express();
+app.set('trust proxy', 1);
 const port = process.env.PORT || 3000;
 const isProd = process.env.NODE_ENV === "production";
 const FRONTEND_URL = (process.env.FRONTEND_URL || "https://aka-wmart.vercel.app").replace(/\/$/, "");
 const allowedOrigins = [FRONTEND_URL, ...(isProd ? [] : ["http://localhost:5173"])];
 
+app.use(helmet());
 app.use(cors({
   origin(origin, cb) {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
@@ -23,10 +28,29 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+app.use('/api', apiLimiter);
+
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const route = req.route ? (req.baseUrl + req.route.path) : '(unmatched)';
+    console.log(`${req.method} ${route} ${res.statusCode} ${Date.now() - start}ms`);
+  });
+  next();
+});
 
 connectDB();
+
+app.get('/health', (req, res) => {
+  const dbUp = mongoose.connection.readyState === 1;
+  res.status(dbUp ? 200 : 503).json({
+    success: dbUp,
+    status: dbUp ? "ok" : "db_unavailable",
+    uptime: Math.round(process.uptime())
+  });
+});
 
 // Email verification route
 app.get('/verify-email/:token', async (req, res) => {
@@ -149,15 +173,23 @@ app.get('/verify-email/:token', async (req, res) => {
 });
 
 // ROUTES
-const jazzcashRoutes = require("./routes/jazzcashRoutes");
-app.use("/api/jazzcash", jazzcashRoutes);
-
 app.use('/api/v1/user', userRoutes);
 app.use('/api/v1/product', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.get('/', (req, res) => {
   res.send('Hello World!');
+});
+
+app.use('/api', (req, res) => res.status(404).json({ success: false, message: "Route not found" }));
+app.use((err, req, res, next) => {
+  console.error("[error]", req.method, req.route ? (req.baseUrl + req.route.path) : '(unmatched)', err && err.message);
+  if (res.headersSent) return next(err);
+  if (err && err.type === 'entity.parse.failed') return res.status(400).json({ success: false, message: "Invalid JSON" });
+  if (err && err.message === 'Only image files are allowed') return res.status(400).json({ success: false, message: "Only image files are allowed" });
+  if (err && err.name === 'MulterError') return res.status(400).json({ success: false, message: err.code === 'LIMIT_FILE_SIZE' ? "Each image must be 5 MB or less" : "Upload error" });
+  const status = err && err.status >= 400 && err.status < 500 ? err.status : 500;
+  return res.status(status).json({ success: false, message: status === 500 ? "Something went wrong" : "Invalid request" });
 });
 
 app.listen(port, () => {
