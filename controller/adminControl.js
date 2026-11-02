@@ -6,7 +6,7 @@ const allUsers= async (req, res) => {
             return res.status(400).json({
                 success: false,
                 message: "No User Found"
-            });
+            });//
         }
         return res.status(200).json({
             success: true,
